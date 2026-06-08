@@ -6,8 +6,11 @@ equity returns into **overnight** and **intraday** legs, replicating the
 persistence/reversal results, and backtesting the firm-level cross-sectional
 strategy with **honest** transaction-cost and execution accounting.
 
-> Status: **Layer 0 scaffold complete & unit-tested.** The decomposition math (the
-> heart) is validated to machine precision. Live data pull needs a Polygon key.
+> Status: **Layers 0 & 1 complete and validated on real data (yfinance, S&P 500
+> 2010–2019).** The decomposition identity is unit-tested to machine precision and
+> the "tug of war" reproduces: overnight-sorted L-S = +0.89%/mo overnight (t=3.07,
+> FF3 α t=2.34) and −1.36%/mo intraday (t=−5.5). Harvesting the overnight leg daily
+> nets −10%/mo — component alpha, not P&L. 27 unit tests green.
 
 ## The decomposition (the heart)
 
@@ -89,14 +92,35 @@ reproducing the paper's direction. S&P 500 equal-weight split ≈ **0.77%/mo
 overnight vs 0.63%/mo intraday** (value-weight proxy: 1.13 vs 0.14); liquid
 mega-caps are even more extreme (overnight ≈ all of the close-to-close return).
 
+## Run Layer 1 (Table 1 + honest costs + Fig. 2)
+
+```bash
+python3 scripts/run_layer1.py --source yahoo --universe sp500 --start 2010-01-01 --end 2019-12-31
+```
+
+Sorts stocks each month on the **lagged 1-month overnight** (Panel A) and **intraday**
+(Panel B) leg, forms VW decile long–shorts, and reports the next month's
+overnight/intraday/cc legs with mean, **CAPM** & **FF3** alphas (Fama-French via the
+Ken French library — free, no key), **Newey-West(12)** t-stats, and skewness. Writes
+a markdown report + the Fig. 2 lag-sweep plot to `reports/output/`. Also runs the
+three cost versions, the dumb-baseline bake-off, and the IS/OOS/lockbox walk-forward.
+
+**Result (S&P 500 2010–2019):** the tug of war reproduces — Panel A overnight L-S
+**+0.89%/mo (t=3.07)**, intraday **−1.36%/mo (t=−5.5)**; Panel B intraday **+0.91%/mo**
+(FF3 α t=2.0), overnight **−0.76%/mo (t=−2.8)**. The overnight edge is **gross
+component attribution**: harvesting it requires daily close→open round trips whose
+break-even cost is ~2 bps (vs a realistic ~27 bps), so it nets **≈ −10%/mo**.
+
 ## Tests
 
 ```bash
 python3 -m pytest -q
 ```
 
-Covers the daily & monthly identity (to 1e-12), corporate-action-in-overnight, the
-missing-open roll, the bad-data filter, and the Polygon parse/merge.
+27 tests covering: the daily & monthly identity (to 1e-12), corporate-action-in-
+overnight, the missing-open roll, the bad-data filter, the Polygon & yfinance
+parse/merge, the FF-factor CSV parser, Newey-West stats & alpha recovery, **no-look-
+ahead in the decile signal**, and the cost-model monotonicity.
 
 ## Known data limitations (surfaced honestly)
 
@@ -120,11 +144,11 @@ missing-open roll, the bad-data filter, and the Polygon parse/merge.
 
 ## Roadmap
 
-- **Layer 1** — persistence/reversal (Table 1): lagged-leg decile sorts, VW
+- **Layer 1** ✅ *done* — persistence/reversal (Table 1): lagged-leg decile sorts, VW
   long–short, next-month overnight/intraday/cc legs, CAPM & 3-factor alphas,
-  Newey-West(12) t-stats, the Fig. 2 lag sweep (1→60 months); plus the
-  three honesty versions (gross component, net harvest-the-leg, tradeable-as-stated)
-  and the dumb-baseline bake-off.
+  Newey-West(12) t-stats, the Fig. 2 lag sweep; plus the three honesty versions
+  (gross component, net harvest-the-leg, tradeable-as-stated), the dumb-baseline
+  bake-off, and the IS/OOS/lockbox walk-forward.
 - **Layer 2** — TugOfWar timing (EWMA legs, 60-mo half-life) and the per-name /
   index overnight−intraday spread feature.
 

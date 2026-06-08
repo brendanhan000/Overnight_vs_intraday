@@ -44,14 +44,14 @@ def _panel_block(panel: Dict, title: str, n_deciles: int) -> str:
     L.append("  Next-month VW decile-average return (%/mo), and L-S = D10 - D1:")
     L.append(_decile_table(panel, n_deciles))
     L.append("")
-    L.append("  Long-short (D10-D1) by leg (%/mo):")
-    L.append(f"    {'leg':<12}{'mean (NW t)':>18}{'CAPM alpha':>18}{'FF3 alpha':>18}{'skew':>8}")
+    L.append("  Long-short (D10-D1) by leg (%/mo; Sharpe annualized):")
+    L.append(f"    {'leg':<12}{'mean (NW t)':>18}{'CAPM alpha':>18}{'FF3 alpha':>18}{'skew':>8}{'Sharpe':>9}")
     for leg in LEGS:
         b = panel["blocks"][leg]
         L.append(
             f"    {LEG_NAME[leg]:<12}{_f(b,'mean','mean_t'):>18}"
             f"{_f(b,'capm_alpha','capm_alpha_t'):>18}"
-            f"{_f(b,'ff3_alpha','ff3_alpha_t'):>18}{b['skew']:8.2f}"
+            f"{_f(b,'ff3_alpha','ff3_alpha_t'):>18}{b['skew']:8.2f}{b['sharpe_ann']:9.2f}"
         )
     return "\n".join(L)
 
@@ -64,13 +64,14 @@ def _costs_block(res: Layer1Result) -> str:
              f"| one-way {c['oneway_bps']:.1f} bps | commission {c['commission_bps']:.2f} bps")
     L.append(f"  avg trading days/month ~ {c['avg_trading_days']:.1f}")
     L.append("")
-    L.append(f"  V1 GROSS overnight L-S        : {_f(h['gross'],'mean','tstat')} %/mo   [component attribution]")
+    L.append(f"  V1 GROSS overnight L-S        : {_f(h['gross'],'mean','tstat')} %/mo  "
+             f"Sharpe {h['gross']['sharpe_ann']:5.2f}   [component attribution]")
     L.append(f"  V2 HARVEST-THE-LEG (daily)    : gross {h['gross']['mean']*PCT:6.3f} -> "
-             f"net {_f(h['net'],'mean','tstat')} %/mo")
+             f"net {_f(h['net'],'mean','tstat')} %/mo  Sharpe {h['net']['sharpe_ann']:5.2f}")
     L.append(f"       avg cost {h['monthly_cost_mean']*PCT:6.2f} %/mo;  break-even round-trip = "
              f"{h['breakeven_roundtrip_bps']:.3f} bps (vs assumed {c['roundtrip_bps']:.1f} bps)")
     L.append(f"  V3 TRADEABLE-AS-STATED (cc)   : gross {t['gross']['mean']*PCT:6.3f} -> "
-             f"net {_f(t['net'],'mean','tstat')} %/mo")
+             f"net {_f(t['net'],'mean','tstat')} %/mo  Sharpe {t['net']['sharpe_ann']:5.2f}")
     L.append(f"       turnover {t['turnover_mean']*PCT:5.1f} %/mo;  cost {t['monthly_cost_mean']*PCT:5.3f} %/mo")
     L.append("")
     L.append("  NOTE: V1 is COMPONENT ALPHA, not P&L. Isolating the overnight leg (V2) means")

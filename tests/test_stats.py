@@ -53,3 +53,13 @@ def test_describe_reports_skew_and_sharpe():
     d = describe(y)
     assert "skew" in d and "sharpe_ann" in d
     assert d["sharpe_ann"] > 0
+
+
+def test_sharpe_annualization_formula():
+    # Sharpe must be the monthly mean / monthly std, annualized by sqrt(12).
+    idx = _months(120)
+    rng = np.random.default_rng(7)
+    y = pd.Series(0.01 + 0.04 * rng.standard_normal(120), index=idx)
+    d = describe(y)
+    expected = y.mean() / y.std(ddof=1) * np.sqrt(12)
+    assert abs(d["sharpe_ann"] - expected) < 1e-9
