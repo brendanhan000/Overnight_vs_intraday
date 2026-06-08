@@ -1,0 +1,21 @@
+# Data cache (never commit pulled market data)
+cache/
+*.parquet
+
+# Reports output (regenerable)
+reports/output/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+.venv/
+venv/
+env/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

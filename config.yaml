@@ -1,0 +1,39 @@
+# ovi — single-source configuration. See ovi/config.py for the dataclasses.
+
+data:
+  start_date: "2004-01-01"
+  end_date: null            # null -> today
+  cache_dir: "cache"        # parquet cache (git-ignored)
+  open_price_method: "official_open"   # or "first_30min_vwap" (paper uses VWAP)
+  rate_limit_per_min: 100   # free tier ~5/min; raise on a paid plan
+  max_retries: 5
+  base_url: "https://api.polygon.io"
+
+filters:
+  min_price: 5.0
+  exclude_bottom_mktcap_quantile: 0.20   # drop bottom quintile by market cap
+  breakpoint_source: "universe_pct"      # cross-sectional pct (NYSE approx)
+  bad_data_lower: -0.30
+  bad_data_upper: 0.50
+
+costs:
+  commission_per_share: 0.005
+  half_spread_bps_close: 5.0
+  half_spread_bps_open: 10.0   # wider for the open window
+  impact_coef_bps: 10.0
+
+portfolio:
+  n_deciles: 10
+  weighting: "value"           # value | equal | dollar_volume
+  long_decile: 10
+  short_decile: 1
+
+strategy:                       # Layer 2 TugOfWar
+  ewma_half_life_months: 60.0
+  skip_recent_months: 1
+
+backtest:
+  newey_west_lags: 12
+  fig2_max_lag_months: 60
+  insample_end: "2013-12-31"    # walk-forward IS/OOS split
+  lockbox_start: "2019-01-01"   # held untouched until the very end
