@@ -23,6 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+schwab = ["schwab-py>=1.3"]   # Schwab Trader (Market Data) API source
 
 [tool.setuptools.packages.find]
 include = ["ovi*"]

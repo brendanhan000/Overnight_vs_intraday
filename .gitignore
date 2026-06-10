@@ -2,8 +2,16 @@
 cache/
 *.parquet
 
+# Secrets / OAuth tokens (NEVER commit)
+.schwab_token.json
+*token*.json
+.env
+
 # Reports output (regenerable)
 reports/output/
+
+# Layer-2 feature store (regenerable parquet for the downstream regime model)
+features/
 
 # Python
 __pycache__/

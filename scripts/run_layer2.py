@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""Run Layer 1 — Table 1 replication + honest costs + Fig. 2 + baselines.
+"""Run Layer 2 — TugOfWar timing + overnight-intraday spread feature.
 
 Examples
-  # Real data via yfinance (uses the warm cache from Layer 0):
-  python3 scripts/run_layer1.py --source yahoo --universe sp500 --start 2010-01-01 --end 2019-12-31
-
-  # Quick synthetic smoke test (no network beyond Fama-French factors):
-  python3 scripts/run_layer1.py --source synthetic
+  python3 scripts/run_layer2.py --source yahoo --universe sp500 --start 2010-01-01 --end 2019-12-31
+  # A 60-month EWMA wants a long sample; pull more history for a real test:
+  python3 scripts/run_layer2.py --source yahoo --universe sp500 --start 2004-01-01
 """
 from __future__ import annotations
 
@@ -23,16 +21,13 @@ from ovi.config import load_config  # noqa: E402
 def _synthetic_panel():
     from ovi.core.synthetic import make_synthetic_panel
 
-    # Cross-sectional spread in overnight drift so the sort has something to find.
-    return make_synthetic_panel(
-        n_tickers=120, n_days=2016, seed=11,
-        overnight_mu=0.0005, overnight_sd=0.012,
-        intraday_mu=0.0003, intraday_sd=0.012, missing_open_frac=0.01,
-    )
+    return make_synthetic_panel(n_tickers=120, n_days=2520, seed=11,
+                                overnight_mu=0.0005, intraday_mu=0.0003,
+                                missing_open_frac=0.01)
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(description="Layer 1 persistence/reversal backtest")
+    p = argparse.ArgumentParser(description="Layer 2 TugOfWar timing")
     p.add_argument("--config", default="config.yaml")
     p.add_argument("--source", choices=["synthetic", "yahoo", "polygon", "schwab"],
                    default="yahoo")
@@ -40,11 +35,10 @@ def main(argv=None) -> int:
                    help="schwab: add dividends back into the overnight leg")
     p.add_argument("--start", default=None)
     p.add_argument("--end", default=None)
-    p.add_argument("--universe", default="sp500", help="yahoo: 'demo' or 'sp500'")
+    p.add_argument("--universe", default="sp500")
     p.add_argument("--tickers", default=None)
     p.add_argument("--out", default="reports/output")
-    p.add_argument("--no-baselines", action="store_true")
-    p.add_argument("--no-fig2", action="store_true")
+    p.add_argument("--features", default="features")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
 
@@ -55,7 +49,6 @@ def main(argv=None) -> int:
     cfg = load_config(args.config)
     start = args.start or cfg.data.start_date
     end = args.end or cfg.data.end_date
-    note = ""
 
     if args.source == "synthetic":
         print("[synthetic] generating tape...")
@@ -73,18 +66,15 @@ def main(argv=None) -> int:
             print("ERROR: no data.", file=sys.stderr)
             return 3
 
-    from ovi.backtest.engine import run_layer1
-    from ovi.reports.layer1 import format_report, write_report
+    from ovi.backtest.tugofwar import run_layer2
+    from ovi.reports.layer2 import format_report, write_report
 
-    print("[layer1] building monthly panel, factors, portfolios, costs, Fig.2...")
-    res = run_layer1(
-        panel, cfg,
-        do_baselines=not args.no_baselines, do_fig2=not args.no_fig2,
-        survivorship_note=note,
-    )
+    print("[layer2] building factors, EWMA TugOfWar, predictive regressions, spread feature...")
+    res = run_layer2(panel, cfg, features_dir=args.features)
     print(format_report(res))
     paths = write_report(res, args.out)
-    print(f"\n[saved] {paths['report']}\n[saved] {paths['fig2']}")
+    print(f"\n[saved] {paths['report']}\n[saved] {paths['fig']}")
+    print(f"[saved] {res.spread_paths['per_name']}\n[saved] {res.spread_paths['index']}")
     return 0
 
 

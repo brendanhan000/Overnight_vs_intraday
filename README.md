@@ -6,11 +6,12 @@ equity returns into **overnight** and **intraday** legs, replicating the
 persistence/reversal results, and backtesting the firm-level cross-sectional
 strategy with **honest** transaction-cost and execution accounting.
 
-> Status: **Layers 0 & 1 complete and validated on real data (yfinance, S&P 500
-> 2010–2019).** The decomposition identity is unit-tested to machine precision and
+> Status: **Layers 0, 1 & 2 complete and validated on real data (yfinance, S&P 500
+> 2004–2019).** The decomposition identity is unit-tested to machine precision and
 > the "tug of war" reproduces: overnight-sorted L-S = +0.89%/mo overnight (t=3.07,
-> FF3 α t=2.34) and −1.36%/mo intraday (t=−5.5). Harvesting the overnight leg daily
-> nets −10%/mo — component alpha, not P&L. 27 unit tests green.
+> FF3 α t=2.34) and −1.36%/mo intraday (t=−5.5); momentum earns overnight and bleeds
+> intraday. Harvesting the overnight leg daily nets −10%/mo — component alpha, not
+> P&L. 33 unit tests green.
 
 ## The decomposition (the heart)
 
@@ -117,10 +118,42 @@ break-even cost is ~2 bps (vs a realistic ~27 bps), so it nets **≈ −10%/mo**
 python3 -m pytest -q
 ```
 
-27 tests covering: the daily & monthly identity (to 1e-12), corporate-action-in-
+33 tests covering: the daily & monthly identity (to 1e-12), corporate-action-in-
 overnight, the missing-open roll, the bad-data filter, the Polygon & yfinance
-parse/merge, the FF-factor CSV parser, Newey-West stats & alpha recovery, **no-look-
-ahead in the decile signal**, and the cost-model monotonicity.
+parse/merge, the FF-factor CSV parser, Newey-West stats / alpha / Sharpe, **no-look-
+ahead in the decile signal AND the TugOfWar predictor**, the cost-model monotonicity,
+and the overnight−intraday spread.
+
+## Live data via Schwab (real broker data)
+
+`--source schwab` pulls real, tradeable prices from the **Schwab Trader (Market
+Data) API** via `schwab-py` (OAuth handled by the library). One-time setup, run
+locally (it needs your Schwab login — I can't do that step for you):
+
+1. On developer.schwab.com create an app with the **Market Data Production**
+   product; set the callback URL to `https://127.0.0.1:8182`; wait for status
+   **"Ready For Use"**.
+2. `pip install schwab-py`, then export credentials:
+   ```bash
+   export SCHWAB_APP_KEY=...      # "App Key"
+   export SCHWAB_APP_SECRET=...   # "Secret"
+   ```
+3. `python3 scripts/schwab_setup.py` — opens a browser to log in, writes
+   `.schwab_token.json` (git-ignored), test-pulls AAPL, and runs an adjustment
+   diagnostic. **Refresh tokens expire after 7 days**, so re-run weekly.
+4. Run the pipeline on Schwab data:
+   ```bash
+   python3 scripts/run_layer1.py --source schwab --universe sp500 \
+       --start 2010-01-01 --end 2019-12-31 --dividend-adjust
+   ```
+
+**Adjustment caveat (important):** Schwab prices are **split-adjusted but NOT
+dividend-adjusted**. The intraday leg (close/open) is unaffected, but the
+overnight/close-to-close leg needs dividends. By default `adj_close` is the
+split-only close (overnight understated by ~the dividend yield, ≈0.15%/mo);
+`--dividend-adjust` adds ex-date dividends back so they land in the overnight leg
+per the paper's convention. The loader uses **market-data endpoints only** — it
+never touches trading/account endpoints.
 
 ## Known data limitations (surfaced honestly)
 
@@ -149,7 +182,19 @@ ahead in the decile signal**, and the cost-model monotonicity.
   Newey-West(12) t-stats, the Fig. 2 lag sweep; plus the three honesty versions
   (gross component, net harvest-the-leg, tradeable-as-stated), the dumb-baseline
   bake-off, and the IS/OOS/lockbox walk-forward.
-- **Layer 2** — TugOfWar timing (EWMA legs, 60-mo half-life) and the per-name /
-  index overnight−intraday spread feature.
+- **Layer 2** ✅ *done* — TugOfWar timing (momentum & short-term-reversal factors,
+  EWMA overnight/intraday legs at 60-mo half-life, sign-flipped predictor, NW
+  predictive regression) and the per-name / index overnight−intraday spread feature
+  (parquet). `python3 scripts/run_layer2.py --source yahoo --universe sp500 --start 2004-01-01`.
+  **Result:** the tug of war is clear (momentum 2010s: +1.35%/mo overnight, −1.09%/mo
+  intraday); the 60-mo EWMA *timing* coefficient turns the expected positive sign for
+  momentum/pooled on the longer 2004–2019 sample but is underpowered (2 factors, one
+  survivorship-biased universe — the paper pools many anomalies over CRSP).
+
+## Outputs
+
+`scripts/run_layer{0,1,2}.py` write to `reports/output/` (text reports + Fig. 2 lag
+sweep + the tug-of-war plot) and `features/` (the overnight−intraday spread parquet
+for a downstream regime model). Both dirs are git-ignored (regenerable).
 
 Based on Lou, Polk & Skouras (2019), *JFE* 134:192–213.

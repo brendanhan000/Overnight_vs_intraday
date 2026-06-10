@@ -51,9 +51,11 @@ def _resolve_tickers(args):
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="Layer 0 market decomposition")
     p.add_argument("--config", default="config.yaml")
-    p.add_argument("--source", choices=["synthetic", "yahoo", "polygon"],
+    p.add_argument("--source", choices=["synthetic", "yahoo", "polygon", "schwab"],
                    default="synthetic")
     p.add_argument("--demo", action="store_true", help="alias for --source synthetic")
+    p.add_argument("--dividend-adjust", action="store_true",
+                   help="schwab: add dividends back so they land in the overnight leg")
     p.add_argument("--start", default=None, help="override config start date")
     p.add_argument("--end", default=None, help="override config end date")
     p.add_argument("--universe", default="demo", help="yahoo: 'demo' or 'sp500'")
@@ -76,43 +78,19 @@ def main(argv=None) -> int:
     if source == "synthetic":
         print("[synthetic] generating tape (no network/API)...")
         panel = _synthetic_panel()
+    else:
+        from ovi.data.sources import resolve_panel
 
-    elif source == "yahoo":
-        from ovi.data.yahoo import YahooLoader
-
-        tickers = _resolve_tickers(args)
-        print(f"[yahoo] loading {len(tickers)} tickers {start} -> {end or 'today'} "
-              f"(cache: {cfg.data.cache_dir})...")
-        loader = YahooLoader(cache_dir=cfg.data.cache_dir)
-        panel = loader.load(tickers, start, end)
-        got = panel["ticker"].nunique() if not panel.empty else 0
-        print(f"[yahoo] {got}/{len(tickers)} tickers returned data "
-              f"({len(loader.missing)} missing).")
-        extra_notes.append(
-            f"SURVIVORSHIP WARNING: Yahoo serves current-listed names only "
-            f"({got}/{len(tickers)} returned); delisted names are absent."
+        tickers = ",".join(_resolve_tickers(args)) if (args.tickers or args.tickers_file) else None
+        print(f"[{source}] loading {start} -> {end or 'today'} (cache: {cfg.data.cache_dir})...")
+        panel, note = resolve_panel(
+            source, cfg=cfg, start=start, end=end, universe=args.universe,
+            tickers=tickers, dividend_adjust=args.dividend_adjust,
         )
+        print(f"[{source}] {note}")
+        extra_notes.append(note)
         if panel.empty:
             print("ERROR: no data returned.", file=sys.stderr)
-            return 3
-
-    else:  # polygon
-        api_key = os.environ.get("POLYGON_API_KEY")
-        if not api_key:
-            print("ERROR: POLYGON_API_KEY is not set. Use --source yahoo or "
-                  "--source synthetic, or set the key.", file=sys.stderr)
-            return 2
-        from ovi.data.polygon import PolygonClient
-
-        client = PolygonClient(
-            api_key=api_key, cache_dir=cfg.data.cache_dir,
-            rate_limit_per_min=cfg.data.rate_limit_per_min,
-            max_retries=cfg.data.max_retries, base_url=cfg.data.base_url,
-        )
-        print(f"[polygon] loading grouped-daily {start} -> {end or 'today'}...")
-        panel = client.load_range(start, end, progress_every=50)
-        if panel.empty:
-            print("ERROR: no data returned for the requested range.", file=sys.stderr)
             return 3
 
     res = run_layer0(panel, cfg)
