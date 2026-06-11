@@ -34,17 +34,30 @@ def main() -> int:
     if not (app_key and app_secret):
         print("ERROR: set SCHWAB_APP_KEY and SCHWAB_APP_SECRET first.", file=sys.stderr)
         return 2
+    manual = "--manual" in sys.argv
     try:
-        from schwab.auth import easy_client
+        if manual:
+            from schwab.auth import client_from_manual_flow
+        else:
+            from schwab.auth import easy_client
     except ImportError:
         print("ERROR: pip install schwab-py", file=sys.stderr)
         return 2
 
-    print(f"[auth] launching login flow (callback {CALLBACK}); a browser will open...")
-    client = easy_client(
-        api_key=app_key, app_secret=app_secret,
-        callback_url=CALLBACK, token_path=TOKEN_PATH,
-    )
+    if manual:
+        # Robust copy-paste flow — no local server to capture the redirect.
+        print("[auth] MANUAL flow:")
+        print("  1) open the URL it prints below, log in, and click ALLOW/ACCEPT")
+        print("  2) you'll land on a blank/'cant be reached' https://127.0.0.1:8182/?code=... page")
+        print("  3) copy that FULL URL from the address bar and paste it back here\n")
+        client = client_from_manual_flow(app_key, app_secret, CALLBACK, TOKEN_PATH)
+    else:
+        print(f"[auth] launching browser login flow (callback {CALLBACK})...")
+        print("       (if nothing happens after login, Ctrl+C and re-run with --manual)")
+        client = easy_client(
+            api_key=app_key, app_secret=app_secret,
+            callback_url=CALLBACK, token_path=TOKEN_PATH,
+        )
     print(f"[auth] OK — token written to {TOKEN_PATH} (refresh expires in ~7 days)")
 
     # 1) Test pull + parser check.
