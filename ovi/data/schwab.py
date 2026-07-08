@@ -188,7 +188,11 @@ class SchwabLoader:
             fp = self.dir / f"{t.replace('/', '-')}.parquet"
             if not force_refresh and fp.exists():
                 d = pd.read_parquet(fp)
-                covered = (not d.empty and d["date"].min() <= start_ts
+                # Allow the cache to start up to a week after the requested start
+                # (the requested start may be a weekend/holiday before the first
+                # trading day), so we don't spuriously re-pull covered tickers.
+                covered = (not d.empty
+                           and d["date"].min() <= start_ts + pd.Timedelta(days=7)
                            and d["date"].max() >= end_ts - pd.Timedelta(days=7))
                 if covered:
                     frames.append(d[(d["date"] >= start_ts) & (d["date"] <= end_ts)])

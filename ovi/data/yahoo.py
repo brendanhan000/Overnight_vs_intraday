@@ -128,7 +128,7 @@ class YahooLoader:
             d = pd.read_parquet(fp)
             covered = (
                 not d.empty
-                and d["date"].min() <= start_ts
+                and d["date"].min() <= start_ts + pd.Timedelta(days=7)
                 and d["date"].max() >= end_ts - pd.Timedelta(days=7)
             )
             if not covered:

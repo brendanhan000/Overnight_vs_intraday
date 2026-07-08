@@ -121,10 +121,13 @@ def _reproduced_block(res: Layer1Result) -> str:
     L.append(f"  [{mark(r['B_overnight_negative'])}] intraday-sorted  -> NEGATIVE overnight next month (reversal)")
     L.append("")
     L.append("  Caveats: VW uses a dollar-volume PROXY (no point-in-time shares); "
-             "yfinance universe is")
-    L.append("  current-listed (SURVIVORSHIP-biased); sample/period differ from the paper's CRSP set.")
-    if res.meta.get("survivorship_note"):
-        L.append(f"  {res.meta['survivorship_note']}")
+             "sample/period differ")
+    L.append("  from the paper's CRSP set.")
+    note = res.meta.get("survivorship_note")
+    if note:
+        L.append(f"  Source: {note}")
+        L.append("  (yahoo/schwab universes are current-listed = SURVIVORSHIP-biased; "
+                 "Polygon includes delisted names)")
     return "\n".join(L)
 
 
